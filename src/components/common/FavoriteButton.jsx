@@ -4,14 +4,20 @@ import { Heart } from 'lucide-react';
 
 /**
  * FavoriteButton Component
- * Toggles favorite status with localStorage support
+ * Toggles favorite status with localStorage support (now stores full recipe)
  */
-export default function FavoriteButton({ recipeId, onToggle, showCount = false, initialCount = 0, size = 'md' }) {
+export default function FavoriteButton({
+  recipeId,
+  recipeData = null, // optional: full recipe object
+  onToggle,
+  showCount = false,
+  initialCount = 0,
+  size = 'md'
+}) {
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteCount, setFavoriteCount] = useState(initialCount);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Size variants
   const sizes = {
     sm: 'w-8 h-8',
     md: 'w-10 h-10',
@@ -24,42 +30,38 @@ export default function FavoriteButton({ recipeId, onToggle, showCount = false, 
     lg: 'w-6 h-6'
   };
 
-  // Check if recipe is favorited on mount
   useEffect(() => {
     const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-    setIsFavorited(favorites.includes(recipeId));
+    setIsFavorited(favorites.some(f => f.id === recipeId));
   }, [recipeId]);
 
-  const handleToggle = async (e) => {
-    e.stopPropagation(); // Prevent card click
-    
+  const handleToggle = (e) => {
+    e.stopPropagation();
     setIsAnimating(true);
     setTimeout(() => setIsAnimating(false), 300);
 
-    // Toggle in localStorage
     const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-    const index = favorites.indexOf(recipeId);
-    
-    let newFavoritedState;
-    if (index > -1) {
-      // Remove from favorites
-      favorites.splice(index, 1);
-      newFavoritedState = false;
-      setFavoriteCount(prev => Math.max(0, prev - 1));
-    } else {
-      // Add to favorites
-      favorites.push(recipeId);
-      newFavoritedState = true;
-      setFavoriteCount(prev => prev + 1);
-    }
-    
-    localStorage.setItem('favorites', JSON.stringify(favorites));
-    setIsFavorited(newFavoritedState);
+    const exists = favorites.some(f => f.id === recipeId);
+    let updatedFavorites;
 
-    // Call parent callback if provided
-    if (onToggle) {
-      onToggle(recipeId, newFavoritedState);
+    if (exists) {
+      // remove
+      updatedFavorites = favorites.filter(f => f.id !== recipeId);
+      setFavoriteCount(prev => Math.max(0, prev - 1));
+      setIsFavorited(false);
+    } else {
+      // add
+      const dataToStore = recipeData
+        ? recipeData // full data if provided
+        : { id: recipeId }; // fallback to ID only
+      updatedFavorites = [...favorites, dataToStore];
+      setFavoriteCount(prev => prev + 1);
+      setIsFavorited(true);
     }
+
+    localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+
+    if (onToggle) onToggle(recipeId, !exists);
   };
 
   return (
@@ -74,17 +76,11 @@ export default function FavoriteButton({ recipeId, onToggle, showCount = false, 
         }
         backdrop-blur-sm shadow-md hover:shadow-lg
         ${isAnimating ? 'scale-125' : 'scale-100'}
-        group
       `}
       title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
     >
       <Heart 
-        className={`
-          ${iconSizes[size]} 
-          transition-all duration-200
-          ${isFavorited ? 'fill-current' : ''}
-          ${isAnimating ? 'animate-pulse' : ''}
-        `} 
+        className={`${iconSizes[size]} transition-all duration-200 ${isFavorited ? 'fill-current' : ''}`} 
       />
       {showCount && favoriteCount > 0 && (
         <span className="text-xs font-semibold">
